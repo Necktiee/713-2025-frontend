@@ -9,19 +9,6 @@ import NetworkErrorView from '@/views/NetworkErrorView.vue'
 import nProgress from 'nprogress'
 import eventService from '@/services/EventService'
 import { useEventStore } from '@/stores/event'
-import express from 'express'
-import cors from 'cors'
-import { uploadFile } from './services/uploadFileService'
-
-const app = express()
-
-const allowedOrigins = ['http://localhost:5173', 'https://713-2025-frontend.vercel.app']
-
-const options: cors.CorsOptions = {
-  origin: allowedOrigins
-}
-
-app.use(cors(options))
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -39,60 +26,79 @@ const router = createRouter({
       name: 'event-layout-view',
       component: EventLayoutView,
       props: true,
+      beforeEnter: (to) => {
+        const id = parseInt(to.params.id as string)
+        const eventStore = useEventStore()
+        return eventService
+          .getEvent(id)
+          .then((response) => {
+            // need to setup the data for the event
+            eventStore.setEvent(response.data)
+          })
+          .catch((error) => {
+            if (error.response && error.response.status === 404) {
+              return {
+                name: '404-resource-view',
+                params: { resource: 'event' },
+              }
+            } else {
+              return { name: 'network-error-view' }
+            }
+          })
+      },
       children: [
         {
           path: '',
           name: 'event-detail-view',
           component: EventDetailView,
+          props: true,
         },
         {
           path: 'register',
           name: 'event-register-view',
           component: EventRegisterView,
+          props: true,
         },
         {
           path: 'edit',
           name: 'event-edit-view',
           component: EventEditView,
+          props: true,
         },
       ],
-      beforeEnter: (to, from, next) => {
-        const eventStore = useEventStore()
-        const eventId = Number(to.params.id)
-        if (!isNaN(eventId)) {
-          eventService.getEvent(eventId)
-            .then((response) => {
-              eventStore.setEvent(response.data)
-              next()
-            })
-            .catch((error) => {
-              if (error.response && error.response.status == 404) {
-                next({ name: '404', params: { resource: 'event' } })
-              } else {
-                next({ name: 'network-error' })
-              }
-            })
-        } else {
-          next({ name: '404', params: { resource: 'event' } })
-        }
-      },
     },
     {
-      path: '/404',
-      name: '404',
+      path: '/about',
+      name: 'about',
+      // route level code-splitting
+      // this generates a separate chunk (About.[hash].js) for this route
+      // which is lazy-loaded when the route is visited.
+      component: () => import('../views/AboutView.vue'),
+    },
+    {
+      path: '/network-error',
+      name: 'network-error-view',
+      component: NetworkErrorView,
+    },
+    {
+      path: '/404/:resource',
+      name: '404-resource-view',
       component: NotFoundView,
       props: true,
     },
     {
-      path: '/network-error',
-      name: 'network-error',
-      component: NetworkErrorView,
-    },
-    {
       path: '/:catchAll(.*)',
-      redirect: { name: '404', params: { resource: 'page' } },
+      name: 'not-found',
+      component: NotFoundView,
     },
   ],
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) {
+      return savedPosition
+    } else {
+      return { top: 0 }
+    }
+  },
 })
 
 router.beforeEach(() => {
@@ -102,9 +108,4 @@ router.beforeEach(() => {
 router.afterEach(() => {
   nProgress.done()
 })
-
-app.listen(3000, () => {
-  console.log('Server is running on port 3000')
-})
-
 export default router
