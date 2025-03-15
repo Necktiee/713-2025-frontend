@@ -9,6 +9,7 @@ import NetworkErrorView from '@/views/NetworkErrorView.vue'
 import nProgress from 'nprogress'
 import eventService from '@/services/EventService'
 import { useEventStore } from '@/stores/event'
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -25,79 +26,55 @@ const router = createRouter({
       name: 'event-layout-view',
       component: EventLayoutView,
       props: true,
-      beforeEnter: (to) => {
-        const id = parseInt(to.params.id as string)
-        const eventStore = useEventStore()
-        return eventService
-          .getEvent(id)
-          .then((response) => {
-            // need to setup the data for the event
-            eventStore.setEvent(response.data)
-          })
-          .catch((error) => {
-            if (error.response && error.response.status === 404) {
-              return {
-                name: '404-resource-view',
-                params: { resource: 'event' },
-              }
-            } else {
-              return { name: 'network-error-view' }
-            }
-          })
-      },
       children: [
         {
           path: '',
           name: 'event-detail-view',
           component: EventDetailView,
-          props: true,
         },
         {
           path: 'register',
           name: 'event-register-view',
           component: EventRegisterView,
-          props: true,
         },
         {
           path: 'edit',
           name: 'event-edit-view',
           component: EventEditView,
-          props: true,
         },
       ],
+      beforeEnter: (to, from, next) => {
+        const eventStore = useEventStore()
+        eventService.getEvent(to.params.id as string)
+          .then((response) => {
+            eventStore.setEvent(response.data)
+            next()
+          })
+          .catch((error) => {
+            if (error.response && error.response.status == 404) {
+              next({ name: '404', params: { resource: 'event' } })
+            } else {
+              next({ name: 'network-error' })
+            }
+          })
+      },
     },
     {
-      path: '/about',
-      name: 'about',
-      // route level code-splitting
-      // this generates a separate chunk (About.[hash].js) for this route
-      // which is lazy-loaded when the route is visited.
-      component: () => import('../views/AboutView.vue'),
-    },
-    {
-      path: '/network-error',
-      name: 'network-error-view',
-      component: NetworkErrorView,
-    },
-    {
-      path: '/404/:resource',
-      name: '404-resource-view',
+      path: '/404',
+      name: '404',
       component: NotFoundView,
       props: true,
     },
     {
+      path: '/network-error',
+      name: 'network-error',
+      component: NetworkErrorView,
+    },
+    {
       path: '/:catchAll(.*)',
-      name: 'not-found',
-      component: NotFoundView,
+      redirect: { name: '404', params: { resource: 'page' } },
     },
   ],
-  scrollBehavior(to, from, savedPosition) {
-    if (savedPosition) {
-      return savedPosition
-    } else {
-      return { top: 0 }
-    }
-  },
 })
 
 router.beforeEach(() => {
@@ -107,4 +84,5 @@ router.beforeEach(() => {
 router.afterEach(() => {
   nProgress.done()
 })
+
 export default router
