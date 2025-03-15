@@ -9,6 +9,19 @@ import NetworkErrorView from '@/views/NetworkErrorView.vue'
 import nProgress from 'nprogress'
 import eventService from '@/services/EventService'
 import { useEventStore } from '@/stores/event'
+import express from 'express'
+import cors from 'cors'
+import { uploadFile } from './services/uploadFileService'
+
+const app = express()
+
+const allowedOrigins = ['http://localhost:5173', 'https://713-2025-frontend.vercel.app']
+
+const options: cors.CorsOptions = {
+  origin: allowedOrigins
+}
+
+app.use(cors(options))
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -45,18 +58,23 @@ const router = createRouter({
       ],
       beforeEnter: (to, from, next) => {
         const eventStore = useEventStore()
-        eventService.getEvent(to.params.id as string)
-          .then((response) => {
-            eventStore.setEvent(response.data)
-            next()
-          })
-          .catch((error) => {
-            if (error.response && error.response.status == 404) {
-              next({ name: '404', params: { resource: 'event' } })
-            } else {
-              next({ name: 'network-error' })
-            }
-          })
+        const eventId = Number(to.params.id)
+        if (!isNaN(eventId)) {
+          eventService.getEvent(eventId)
+            .then((response) => {
+              eventStore.setEvent(response.data)
+              next()
+            })
+            .catch((error) => {
+              if (error.response && error.response.status == 404) {
+                next({ name: '404', params: { resource: 'event' } })
+              } else {
+                next({ name: 'network-error' })
+              }
+            })
+        } else {
+          next({ name: '404', params: { resource: 'event' } })
+        }
       },
     },
     {
@@ -83,6 +101,10 @@ router.beforeEach(() => {
 
 router.afterEach(() => {
   nProgress.done()
+})
+
+app.listen(3000, () => {
+  console.log('Server is running on port 3000')
 })
 
 export default router
